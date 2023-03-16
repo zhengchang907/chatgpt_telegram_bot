@@ -1,3 +1,10 @@
+azure_chatgpt:
+  name: 👩🏼‍🎓 Azure ChatGPT
+  welcome_message: 👩🏼‍🎓 Hi, I'm <b>ChatGPT on Azure OpenAI service</b>. How can I help you?
+  prompt_start: |
+    The system is an AI assistant that helps people find information.
+  parse_mode: html
+
 assistant:
   name: 👩🏼‍🎓 General Assistant
   welcome_message: 👩🏼‍🎓 Hi, I'm <b>ChatGPT general assistant</b>. How can I help you?

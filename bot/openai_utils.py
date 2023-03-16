@@ -1,8 +1,10 @@
 import config
-
 import tiktoken
 import openai
 openai.api_key = config.openai_api_key
+openai.api_base = config.openai_api_base
+openai.api_version = "2022-12-01"
+openai.api_type = "azure"
 
 
 CHAT_MODES = config.chat_modes
@@ -19,6 +21,39 @@ OPENAI_COMPLETION_OPTIONS = {
 class ChatGPT:
     def __init__(self, use_chatgpt_api=True):
         self.use_chatgpt_api = use_chatgpt_api
+    
+    def send_message_to_azure(self, message, dialog_messages=[], chat_mode="azure_chatgpt"):
+        n_dialog_messages_before = len(dialog_messages)
+        answer = None
+        while answer is None:
+            try:
+                messages = self._generate_prompt_messages_for_chatgpt_api_azure(message, dialog_messages, chat_mode)
+                print(message)
+                r = openai.Completion.create(
+                    engine=config.azure_openai_api_deployment_name,
+                    prompt=messages,
+                    stop=["<|im_end|>"],
+                    **OPENAI_COMPLETION_OPTIONS
+                )
+
+                print(r)
+
+                answer = r['choices'][0]["text"]
+
+                print("answer: " + answer)
+
+                n_used_tokens = r.usage.total_tokens
+                
+            except openai.error.InvalidRequestError as e:  # too many tokens
+                if len(dialog_messages) == 0:
+                    raise ValueError("Dialog messages is reduced to zero, but still has too many tokens to make completion") from e
+
+                # forget first message in dialog_messages
+                dialog_messages = dialog_messages[1:]
+
+        n_first_dialog_messages_removed = n_dialog_messages_before - len(dialog_messages)
+
+        return answer, n_used_tokens, n_first_dialog_messages_removed
     
     async def send_message(self, message, dialog_messages=[], chat_mode="assistant"):
         if chat_mode not in CHAT_MODES.keys():
@@ -129,6 +164,26 @@ class ChatGPT:
         prompt += "ChatGPT: "
 
         return prompt
+
+    def _generate_prompt_messages_for_chatgpt_api_azure(self, message, dialog_messages, chat_mode):
+        prompt = CHAT_MODES[chat_mode]["prompt_start"]
+        
+        messages = "<|im_start|>system\n"
+        messages += prompt
+        messages += "<|im_end|>\n"
+        
+        for dialog_message in dialog_messages:
+            messages += "<|im_start|>user\n" + dialog_message["user"]
+            messages += "\n<|im_end|>\n"
+            messages += "<|im_start|>assistant\n"
+            messages += dialog_message["bot"]
+            messages += "\n<|im_end|>\n"
+        messages += "<|im_start|>user\n"
+        messages += message
+        messages += "\n<|im_end|>\n"
+        messages += "<|im_start|>assistant\n"
+
+        return messages
 
     def _generate_prompt_messages_for_chatgpt_api(self, message, dialog_messages, chat_mode):
         prompt = CHAT_MODES[chat_mode]["prompt_start"]

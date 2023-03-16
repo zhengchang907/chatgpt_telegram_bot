@@ -144,19 +144,24 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             }[openai_utils.CHAT_MODES[chat_mode]["parse_mode"]]
 
             chatgpt_instance = openai_utils.ChatGPT(use_chatgpt_api=config.use_chatgpt_api)
-            if config.enable_message_streaming:
-                gen = chatgpt_instance.send_message_stream(message, dialog_messages=dialog_messages, chat_mode=chat_mode)
+            if config.use_azure:
+                loop = asyncio.get_running_loop()
+                gen = await loop.run_in_executor(None, chatgpt_instance.send_message_to_azure, message, dialog_messages, "azure_chatgpt")
+                print(gen)
             else:
-                answer, n_used_tokens, n_first_dialog_messages_removed = await chatgpt_instance.send_message(
-                    message,
-                    dialog_messages=dialog_messages,
-                    chat_mode=chat_mode
-                )
+                if config.enable_message_streaming:
+                    gen = chatgpt_instance.send_message_stream(message, dialog_messages=dialog_messages, chat_mode=chat_mode)
+                else:
+                    answer, n_used_tokens, n_first_dialog_messages_removed = await chatgpt_instance.send_message(
+                        message,
+                        dialog_messages=dialog_messages,
+                        chat_mode=chat_mode
+                    )
 
-                async def fake_gen():
-                    yield "finished", answer, n_used_tokens, n_first_dialog_messages_removed
+                    async def fake_gen():
+                        yield "finished", answer, n_used_tokens, n_first_dialog_messages_removed
 
-                gen = fake_gen()
+                    gen = fake_gen()
 
             # send message to user
             prev_answer = ""
