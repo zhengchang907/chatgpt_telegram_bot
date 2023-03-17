@@ -22,25 +22,19 @@ class ChatGPT:
     def __init__(self, use_chatgpt_api=True):
         self.use_chatgpt_api = use_chatgpt_api
     
-    def send_message_to_azure(self, message, dialog_messages=[], chat_mode="azure_chatgpt"):
+    async def send_message_to_azure(self, message, dialog_messages=[], chat_mode="azure_chatgpt"):
         n_dialog_messages_before = len(dialog_messages)
         answer = None
         while answer is None:
             try:
                 messages = self._generate_prompt_messages_for_chatgpt_api_azure(message, dialog_messages, chat_mode)
-                print(message)
-                r = openai.Completion.create(
+                r = await openai.Completion.acreate(
                     engine=config.azure_openai_api_deployment_name,
                     prompt=messages,
                     stop=["<|im_end|>"],
                     **OPENAI_COMPLETION_OPTIONS
                 )
-
-                print(r)
-
                 answer = r['choices'][0]["text"]
-
-                print("answer: " + answer)
 
                 n_used_tokens = r.usage.total_tokens
                 

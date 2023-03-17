@@ -145,9 +145,16 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
 
             chatgpt_instance = openai_utils.ChatGPT(use_chatgpt_api=config.use_chatgpt_api)
             if config.use_azure:
-                loop = asyncio.get_running_loop()
-                gen = await loop.run_in_executor(None, chatgpt_instance.send_message_to_azure, message, dialog_messages, "azure_chatgpt")
-                print(gen)
+                answer, n_used_tokens, n_first_dialog_messages_removed = await chatgpt_instance.send_message_to_azure(
+                    message, 
+                    dialog_messages=dialog_messages, 
+                    chat_mode="azure_chatgpt"
+                )
+
+                async def fake_gen():
+                    yield "finished", answer, n_used_tokens, n_first_dialog_messages_removed
+
+                gen = fake_gen()
             else:
                 if config.enable_message_streaming:
                     gen = chatgpt_instance.send_message_stream(message, dialog_messages=dialog_messages, chat_mode=chat_mode)
@@ -179,7 +186,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
 
                 answer = answer[:4096]  # telegram message limit
                 if i == 0:  # send first message (then it'll be edited if message streaming is enabled)
-                    try:                    
+                    try:
                         sent_message = await update.message.reply_text(answer, parse_mode=parse_mode)
                     except telegram.error.BadRequest as e:
                         if str(e).startswith("Message must be non-empty"):  # first answer chunk from openai was empty
